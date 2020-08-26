@@ -7,7 +7,15 @@
 typedef void (__cdecl *barebonesBytecode)();
 //https://defuse.ca/online-x86-assembler.htm#disassembly Don't forget to check x64
 
+typedef struct {
+    void* rdx;
+} typeSaveStruct;
+
 void __stdcall displayOneCharacter(int charToShow);
+int __stdcall getOneCharacter();
+
+void preFunctionCall(BYTE** pCurrentPos, typeSaveStruct* saveStruct);
+void postFunctionCall(BYTE** pCurrentPos, typeSaveStruct* saveStruct);
 
 int main(int argc, char** argv)
 {
@@ -16,9 +24,8 @@ int main(int argc, char** argv)
     BYTE* bytecode = reinterpret_cast<BYTE*>(VirtualAlloc(NULL, 65536, MEM_COMMIT, PAGE_EXECUTE_READWRITE));
     BYTE* currentPos = bytecode;
 
-    struct {
-        void* rdx = NULL;
-    } saveStruct;
+    typeSaveStruct saveStruct;
+    saveStruct.rdx = NULL;
 
     void (__stdcall *dispFuncPtr)(int) = displayOneCharacter;
     dispFuncPtr('B');
@@ -91,20 +98,7 @@ int main(int argc, char** argv)
             currentPos += sizeof(DWORD);
             break;
         case '.':
-            //We save RDX beforehand
-
-            *(short*)currentPos = 0xB848; //Beginning of mov rax, ADDRESS
-            currentPos += sizeof(short);
-            *(void**)currentPos = (void*)(&saveStruct.rdx); //The actual ADDRESS of saveStruct.rdx
-            currentPos += sizeof(void**);
-            *(DWORD*)currentPos = 0x00108948; //mov [rax], rdx
-            currentPos += 3;
-
-            //Let's move the stack around to avoid any bad stuff happening (or else the call wrecks the stack and thus the call stack for some reason)
-            *(void**)currentPos = (void*)0x00000000ffec8148; //sub rsp,0xff
-            currentPos += 7;
-            *(void**)currentPos = (void*)0x00000000ffed8148; //sub rbp,0xff
-            currentPos += 7;
+            preFunctionCall(&currentPos, &saveStruct);
 
             //We do the function calling stuff
             *(DWORD*)currentPos = 0x000A8B48; //mov rcx, [rdx]
@@ -116,23 +110,7 @@ int main(int argc, char** argv)
             *(short*)currentPos = 0xD0FF; //call rax
             currentPos += sizeof(short);
 
-            //Let's move back the stack in it's normal place
-            *(void**)currentPos = (void*)0x00000000ffc48148; //add rsp,0xff
-            currentPos += 7;
-            *(void**)currentPos = (void*)0x00000000ffc58148; //add rbp,0xff
-            currentPos += 7;
-
-            //We restore edx
-            *currentPos = 0x50; //push rax
-            currentPos++;
-            *(short*)currentPos = 0xB848; //Beginning of mov rax, ADDRESS
-            currentPos += sizeof(short);
-            *(void**)currentPos = (void*)(&saveStruct.rdx); //The actual ADDRESS of saveStruct.rdx
-            currentPos += sizeof(void**);
-            *(DWORD*)currentPos = 0x00108B48; //mov rdx, [rax]
-            currentPos += 3;
-            *currentPos = 0x58; //pop rax
-            currentPos++;
+            postFunctionCall(&currentPos, &saveStruct);
 
             break;
         case ',':
@@ -162,4 +140,48 @@ void __stdcall displayOneCharacter(int charToShow)
 {
     putchar(charToShow & 0xFF); //Only keep the least significant byte (because ASCII, duh)
     return;
+}
+
+int __stdcall getOneCharacter()
+{
+    return getchar() & 0xFF;
+}
+
+void preFunctionCall(BYTE** pCurrentPos, typeSaveStruct* saveStruct)
+{
+    //We save RDX beforehand
+
+    **(short**)pCurrentPos = 0xB848; //Beginning of mov rax, ADDRESS
+    *pCurrentPos += sizeof(short);
+    **(void***)pCurrentPos = (void*)(&saveStruct->rdx); //The actual ADDRESS of saveStruct.rdx
+    *pCurrentPos += sizeof(void**);
+    **(DWORD**)pCurrentPos = 0x00108948; //mov [rax], rdx
+    *pCurrentPos += 3;
+
+    //Let's move the stack around to avoid any bad stuff happening (or else the call wrecks the stack and thus the call stack for some reason)
+    **(void***)pCurrentPos = (void*)0x00000000ffec8148; //sub rsp,0xff
+    *pCurrentPos += 7;
+    **(void***)pCurrentPos = (void*)0x00000000ffed8148; //sub rbp,0xff
+    *pCurrentPos += 7;
+}
+
+void postFunctionCall(BYTE** pCurrentPos, typeSaveStruct* saveStruct)
+{
+    //Let's move back the stack in it's normal place
+    **(void***)pCurrentPos = (void*)0x00000000ffc48148; //add rsp,0xff
+    *pCurrentPos += 7;
+    **(void***)pCurrentPos = (void*)0x00000000ffc58148; //add rbp,0xff
+    *pCurrentPos += 7;
+
+    //We restore edx
+    **pCurrentPos = 0x50; //push rax
+    *pCurrentPos += 1;
+    **(short**)pCurrentPos = 0xB848; //Beginning of mov rax, ADDRESS
+    *pCurrentPos += sizeof(short);
+    **(void***)pCurrentPos = (void*)(&saveStruct->rdx); //The actual ADDRESS of saveStruct.rdx
+    *pCurrentPos += sizeof(void**);
+    **(DWORD**)pCurrentPos = 0x00108B48; //mov rdx, [rax]
+    *pCurrentPos += 3;
+    **pCurrentPos = 0x58; //pop rax
+    *pCurrentPos += 1;
 }

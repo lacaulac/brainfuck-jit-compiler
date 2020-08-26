@@ -140,10 +140,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="BFJITCompiler.cpp" />
-    <ClCompile Include="CompilationState.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="CompilationState.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
