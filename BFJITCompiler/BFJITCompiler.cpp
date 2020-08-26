@@ -4,7 +4,7 @@
 #include <iostream>
 #include <Windows.h>
 
-typedef void (__stdcall *barebonesBytecode)();
+typedef void (__cdecl *barebonesBytecode)();
 //https://defuse.ca/online-x86-assembler.htm#disassembly Don't forget to check x64
 
 void __stdcall displayOneCharacter(int charToShow);
@@ -16,10 +16,14 @@ int main(int argc, char** argv)
     BYTE* bytecode = reinterpret_cast<BYTE*>(VirtualAlloc(NULL, 65536, MEM_COMMIT, PAGE_EXECUTE_READWRITE));
     BYTE* currentPos = bytecode;
 
+    struct {
+        void* rdx = NULL;
+    } saveStruct;
+
     void (__stdcall *dispFuncPtr)(int) = displayOneCharacter;
-    displayOneCharacter('B');
-    displayOneCharacter('F');
-    displayOneCharacter(':');
+    dispFuncPtr('B');
+    dispFuncPtr('F');
+    dispFuncPtr(':');
 
     //Let's set rdx to programMemory's address
     *currentPos = 0x48;
@@ -57,12 +61,12 @@ int main(int argc, char** argv)
         {
             if (!wasAddSubInstruction)
             {
-                //On rentre dans un bloc (potentiellement d'une seule instruction) arithmétique, on move la valeur pointée par rdx
+                //Entering an "arithmetic" block (even though it might only contain one arithmetic instruction) arithmétique, so we get the value pointed by rdx into rax in order to do the math stuff
                 *(DWORD*)(currentPos) = 0x00028B48; //Little-endian reversed of "mov rax, [rdx]"
                 currentPos += 3;
             }
         }
-        else if(wasAddSubInstruction) //On sort d'un bloc arithmétique
+        else if(wasAddSubInstruction) //Leaving an "arithmetic" block
         {
             *(DWORD*)(currentPos) = 0x00028948; //Little-endian reversed of "mov [rdx], rax"
             currentPos += 3;
@@ -88,20 +92,21 @@ int main(int argc, char** argv)
             break;
         case '.':
             //We save RDX beforehand
-            /*
-            
-            
-            
-            
-            TODO: Faire la sauvegarde dans une variable locale pas affectée
-            
-            
-            
-            
-            
-            */
-            *(DWORD*)currentPos = 0x00D18949; // mov r9,rdx
+
+            *(short*)currentPos = 0xB848; //Beginning of mov rax, ADDRESS
+            currentPos += sizeof(short);
+            *(void**)currentPos = (void*)(&saveStruct.rdx); //The actual ADDRESS of saveStruct.rdx
+            currentPos += sizeof(void**);
+            *(DWORD*)currentPos = 0x00108948; //mov [rax], rdx
             currentPos += 3;
+
+            //Let's move the stack around to avoid any bad stuff happening (or else the call wrecks the stack and thus the call stack for some reason)
+            *(void**)currentPos = (void*)0x00000000ffec8148; //sub rsp,0xff
+            currentPos += 7;
+            *(void**)currentPos = (void*)0x00000000ffed8148; //sub rbp,0xff
+            currentPos += 7;
+
+            //We do the function calling stuff
             *(DWORD*)currentPos = 0x000A8B48; //mov rcx, [rdx]
             currentPos += 3;
             *(short*)currentPos = 0xB848; //Beginning of mov rax, ADDRESS
@@ -110,9 +115,25 @@ int main(int argc, char** argv)
             currentPos += sizeof(void**);
             *(short*)currentPos = 0xD0FF; //call rax
             currentPos += sizeof(short);
+
+            //Let's move back the stack in it's normal place
+            *(void**)currentPos = (void*)0x00000000ffc48148; //add rsp,0xff
+            currentPos += 7;
+            *(void**)currentPos = (void*)0x00000000ffc58148; //add rbp,0xff
+            currentPos += 7;
+
             //We restore edx
-            *(DWORD*)currentPos = 0x00CA894C; // mov rdx,r9
+            *currentPos = 0x50; //push rax
+            currentPos++;
+            *(short*)currentPos = 0xB848; //Beginning of mov rax, ADDRESS
+            currentPos += sizeof(short);
+            *(void**)currentPos = (void*)(&saveStruct.rdx); //The actual ADDRESS of saveStruct.rdx
+            currentPos += sizeof(void**);
+            *(DWORD*)currentPos = 0x00108B48; //mov rdx, [rax]
             currentPos += 3;
+            *currentPos = 0x58; //pop rax
+            currentPos++;
+
             break;
         case ',':
             break;
@@ -123,13 +144,13 @@ int main(int argc, char** argv)
         }
     }
 
-    //Ajout d'un ret à la fin du programme
+    //Adding a `ret` instruction at the end to get back to executing main
     *currentPos = '\xC3';
 
     barebonesBytecode bytecodeFunc = reinterpret_cast<barebonesBytecode>(bytecode);
     bytecodeFunc();
 
-    //Exécution
+    //Execution
     
 
     fclose(sourceFile);
@@ -139,6 +160,6 @@ int main(int argc, char** argv)
 
 void __stdcall displayOneCharacter(int charToShow)
 {
-    putchar(charToShow & 0xFF); //On ne garde que les bits peu significatifs
+    putchar(charToShow & 0xFF); //Only keep the least significant byte (because ASCII, duh)
     return;
 }
