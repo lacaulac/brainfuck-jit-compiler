@@ -1,7 +1,7 @@
 // BFJITCompiler.cpp : Ce fichier contient la fonction 'main'. L'exécution du programme commence et se termine à cet endroit.
 //
 
-#include <iostream>
+#include <stack>
 #include <Windows.h>
 
 typedef void (__cdecl *barebonesBytecode)();
@@ -21,16 +21,25 @@ void postFunctionCall(BYTE** pCurrentPos, typeSaveStruct* saveStruct);
 
 int main(int argc, char** argv)
 {
+    //The data-bank of the brainfuck program
     BYTE programMemory[256];
     memset(programMemory, 0, 256);
+
+    //The memory location where the processor instructions will be stored and executed
     BYTE* bytecode = reinterpret_cast<BYTE*>(VirtualAlloc(NULL, 65536, MEM_COMMIT, PAGE_EXECUTE_READWRITE));
+    //The current position when compiling
     BYTE* currentPos = bytecode;
 
+    //Stores the instruction adresses of loop starts that haven't found an end as of yet
+    std::stack<BYTE*> loopStack;
+
+    //Contains some data that needs saving in certain situations
     typeSaveStruct saveStruct;
     saveStruct.rdx = NULL;
 
     void (__stdcall *dispFuncPtr)(int) = displayOneCharacter;
     int (__stdcall *getCFuncPtr)() = getOneCharacter;
+
     dispFuncPtr('B');
     dispFuncPtr('F');
     dispFuncPtr(':');
@@ -137,8 +146,33 @@ int main(int argc, char** argv)
 
             break;
         case '[':
+            //Just add the current instruction address to the loop stack
+            loopStack.push(currentPos);
             break;
         case ']':
+            if (!loopStack.empty()) //If there's unclosed loops in the loop stack
+            {
+                BYTE* loopStartPosition = loopStack.top(); //Get the last added loop beginning location
+                loopStack.pop(); //Remove it from the loop stack
+
+                *(short*)currentPos = 0x028A; //mov al, [rdx]
+                currentPos += sizeof(short);
+
+                *(short*)currentPos = 0xC084; //test al, al
+                currentPos += sizeof(short);
+
+                *(short*)currentPos = 0x0C74; //jz atadbitfurther
+                currentPos += sizeof(short);
+
+                *(short*)currentPos = 0xB848; //Beginning of mov rax, ADDRESS
+                currentPos += sizeof(short);
+                *(BYTE**)currentPos = loopStartPosition; //The actual ADDRESS of the loop beginning
+                currentPos += sizeof(BYTE**);
+
+                *(short*)currentPos = 0xE0FF; //jmp rax
+                currentPos += sizeof(short);
+
+            }
             break;
         }
     }
