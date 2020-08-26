@@ -6,12 +6,14 @@
 
 typedef void (__cdecl *barebonesBytecode)();
 //https://defuse.ca/online-x86-assembler.htm#disassembly Don't forget to check x64
-
 typedef struct {
     void* rdx;
 } typeSaveStruct;
 
+//A wrapper around putchar
 void __stdcall displayOneCharacter(int charToShow);
+
+//A wrapper around getchar
 int __stdcall getOneCharacter();
 
 void preFunctionCall(BYTE** pCurrentPos, typeSaveStruct* saveStruct);
@@ -28,6 +30,7 @@ int main(int argc, char** argv)
     saveStruct.rdx = NULL;
 
     void (__stdcall *dispFuncPtr)(int) = displayOneCharacter;
+    int (__stdcall *getCFuncPtr)() = getOneCharacter;
     dispFuncPtr('B');
     dispFuncPtr('F');
     dispFuncPtr(':');
@@ -105,7 +108,7 @@ int main(int argc, char** argv)
             currentPos += 3;
             *(short*)currentPos = 0xB848; //Beginning of mov rax, ADDRESS
             currentPos += sizeof(short);
-            *(void**)currentPos = (void*)dispFuncPtr; //The actual ADDRESS of putchar
+            *(void**)currentPos = (void*)dispFuncPtr; //The actual ADDRESS of displayOneCharacter
             currentPos += sizeof(void**);
             *(short*)currentPos = 0xD0FF; //call rax
             currentPos += sizeof(short);
@@ -114,6 +117,24 @@ int main(int argc, char** argv)
 
             break;
         case ',':
+            preFunctionCall(&currentPos, &saveStruct);
+
+            *(short*)currentPos = 0xB848; //Beginning of mov rax, ADDRESS
+            currentPos += sizeof(short);
+            *(void**)currentPos = (void*)getCFuncPtr; //The actual ADDRESS of getOneCharacter
+            currentPos += sizeof(void**);
+            *(short*)currentPos = 0xD0FF; //call rax
+            currentPos += sizeof(short);
+
+            //Can't keep the return value in rax since it's used by postFunctionCall to restore edx
+            *(DWORD*)currentPos = 0x00C28949; //mov r10, rax
+            currentPos += 3;
+
+            postFunctionCall(&currentPos, &saveStruct);
+
+            *(DWORD*)currentPos = 0x0012894C; //mov [rdx], r10
+            currentPos += 3;
+
             break;
         case '[':
             break;

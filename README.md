@@ -26,7 +26,6 @@ The program works by performing this three tasks:
 
 The following BF language features are missing:
 
-- `,` character input
 - `[` & `]` loops
 
 ### Optimisation
