@@ -22,12 +22,6 @@ The program works by performing this three tasks:
 
 ## What's left to do
 
-### Features
-
-The following BF language features are missing:
-
-- `[` & `]` loops
-
 ### Optimisation
 
 - Arithmetic operations chaining
