@@ -24,7 +24,4 @@ The program works by performing this three tasks:
 
 ### Optimisation
 
-- Arithmetic operations chaining
-  - Make it so that only one add or sub instruction is used if multiple arithmetic BF instructions are chained
-- Character displaying
-  - Simplify the way a character is displayed, as a lot of CPU cycles are used due to bug fixes
+- Actually doing JIT compilation
