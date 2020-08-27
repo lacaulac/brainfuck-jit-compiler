@@ -19,7 +19,7 @@ void postFunctionCall(BYTE** pCurrentPo);
 int main(int argc, char** argv)
 {
     //The data-bank of the brainfuck program
-    BYTE programMemory[65536];
+    BYTE* programMemory = reinterpret_cast<BYTE*>(VirtualAlloc(NULL, 16777216, MEM_COMMIT, PAGE_EXECUTE_READWRITE));
     memset(programMemory, 0, 65536);
 
     //The memory location where the processor instructions will be stored and executed
@@ -214,7 +214,10 @@ int main(int argc, char** argv)
 
     //Adding a `ret` instruction at the end to get back to executing main
     *currentPos = '\xC3';
-    
+
+    //Close the source code file
+    fclose(sourceFile);
+
     //Execution
 
     printf("The compiled code is %d bytes long.\nNow executing...\n\n", (currentPos - bytecode) + 1);
@@ -223,9 +226,11 @@ int main(int argc, char** argv)
     barebonesBytecode bytecodeFunc = reinterpret_cast<barebonesBytecode>(bytecode);
     bytecodeFunc();
 
-
-    fclose(sourceFile);
+    //Free the allocated memory
+    VirtualFree(programMemory, NULL, MEM_RELEASE);
     VirtualFree(bytecode, NULL, MEM_RELEASE);
+
+
     return 0;
 }
 
