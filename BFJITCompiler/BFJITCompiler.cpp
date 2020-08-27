@@ -22,16 +22,16 @@ void postFunctionCall(BYTE** pCurrentPos, typeSaveStruct* saveStruct);
 int main(int argc, char** argv)
 {
     //The data-bank of the brainfuck program
-    BYTE programMemory[256];
-    memset(programMemory, 0, 256);
+    BYTE programMemory[16777216];
+    memset(programMemory, 0, 16777216);
 
     //The memory location where the processor instructions will be stored and executed
-    BYTE* bytecode = reinterpret_cast<BYTE*>(VirtualAlloc(NULL, 65536, MEM_COMMIT, PAGE_EXECUTE_READWRITE));
+    BYTE* bytecode = reinterpret_cast<BYTE*>(VirtualAlloc(NULL, 16777216, MEM_COMMIT, PAGE_EXECUTE_READWRITE));
     //The current position when compiling
     BYTE* currentPos = bytecode;
 
-    //Stores the instruction adresses of loop starts that haven't found an end as of yet
-    std::stack<BYTE*> loopStack;
+    //Stores the instruction adresses of non-yet written/defined end-of-loop pointers
+    std::stack<BYTE**> loopStack;
 
     //Contains some data that needs saving in certain situations
     typeSaveStruct saveStruct;
@@ -39,10 +39,6 @@ int main(int argc, char** argv)
 
     void (__stdcall *dispFuncPtr)(int) = displayOneCharacter;
     int (__stdcall *getCFuncPtr)() = getOneCharacter;
-
-    dispFuncPtr('B');
-    dispFuncPtr('F');
-    dispFuncPtr(':');
 
     //Let's set rdx to programMemory's address
     *currentPos = 0x48;
@@ -146,32 +142,49 @@ int main(int argc, char** argv)
 
             break;
         case '[':
-            //Just add the current instruction address to the loop stack
-            loopStack.push(currentPos);
+            //Add the "while" code
+            *(DWORD*)(currentPos) = 0x00C03148; //xor rax, rax
+            currentPos += 3;
+
+            *(short*)currentPos = 0x028A; //mov al, [rdx]
+            currentPos += sizeof(short);
+
+            *(short*)currentPos = 0xC084; //test al, al
+            currentPos += sizeof(short);
+
+            *(short*)currentPos = 0x0C75; //jnz atadbitfurther
+            currentPos += sizeof(short);
+
+            *(short*)currentPos = 0xB848; //Beginning of mov rax, ADDRESS
+            currentPos += sizeof(short);
+
+            loopStack.push(reinterpret_cast<BYTE**>(currentPos)); //Let's store the address where we should write the end of loop's address whenever we know it
+
+            *(BYTE***)currentPos = reinterpret_cast<BYTE**>(0xAAAAAAAAAAAAAAAA); //A temporary adress for the after-loop
+            currentPos += sizeof(BYTE***);
+
+            *(short*)currentPos = 0xE0FF; //jmp rax
+            currentPos += sizeof(short);
+
             break;
         case ']':
             if (!loopStack.empty()) //If there's unclosed loops in the loop stack
             {
-                BYTE* loopStartPosition = loopStack.top(); //Get the last added loop beginning location
+                BYTE** loopStartPosition = loopStack.top(); //Get the last added loop beginning location
                 loopStack.pop(); //Remove it from the loop stack
 
-                *(short*)currentPos = 0x028A; //mov al, [rdx]
-                currentPos += sizeof(short);
-
-                *(short*)currentPos = 0xC084; //test al, al
-                currentPos += sizeof(short);
-
-                *(short*)currentPos = 0x0C74; //jz atadbitfurther
-                currentPos += sizeof(short);
+                //Let's jump back to the zero-equality checking code
 
                 *(short*)currentPos = 0xB848; //Beginning of mov rax, ADDRESS
                 currentPos += sizeof(short);
-                *(BYTE**)currentPos = loopStartPosition; //The actual ADDRESS of the loop beginning
+
+                *(BYTE**)currentPos = reinterpret_cast<BYTE*>(loopStartPosition) - 11; //A temporary adress for the after-loop
                 currentPos += sizeof(BYTE**);
 
                 *(short*)currentPos = 0xE0FF; //jmp rax
                 currentPos += sizeof(short);
 
+                *loopStartPosition = currentPos;
             }
             break;
         }
@@ -179,12 +192,15 @@ int main(int argc, char** argv)
 
     //Adding a `ret` instruction at the end to get back to executing main
     *currentPos = '\xC3';
+    
+    //Execution
+
+    printf("The compiled code is %d bytes long.\nNow executing...\n\n", (currentPos - bytecode) + 1);
+
 
     barebonesBytecode bytecodeFunc = reinterpret_cast<barebonesBytecode>(bytecode);
     bytecodeFunc();
 
-    //Execution
-    
 
     fclose(sourceFile);
     VirtualFree(bytecode, NULL, MEM_RELEASE);
