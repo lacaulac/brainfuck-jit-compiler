@@ -22,8 +22,8 @@ void postFunctionCall(BYTE** pCurrentPos, typeSaveStruct* saveStruct);
 int main(int argc, char** argv)
 {
     //The data-bank of the brainfuck program
-    BYTE programMemory[16777216];
-    memset(programMemory, 0, 16777216);
+    BYTE programMemory[65536];
+    memset(programMemory, 0, 65536);
 
     //The memory location where the processor instructions will be stored and executed
     BYTE* bytecode = reinterpret_cast<BYTE*>(VirtualAlloc(NULL, 16777216, MEM_COMMIT, PAGE_EXECUTE_READWRITE));
@@ -90,20 +90,48 @@ int main(int argc, char** argv)
         switch (currentReadSourceChar)
         {
         case '>':
-            *(DWORD*)(currentPos) = 0x01C28348; //Little-endian reversed of "add rdx,0x1"
-            currentPos += sizeof(DWORD);
+            if (oldChar == '>' && *(currentPos - 1) != 0x7F) //If the last operation was an addition and the addition amount is less than 0x7F
+            {
+                *(currentPos - 1) += 1;
+            }
+            else
+            {
+                *(DWORD*)(currentPos) = 0x01C28348; //Little-endian reversed of "add rdx,0x1"
+                currentPos += sizeof(DWORD);
+            }
             break;
         case '<':
-            *(DWORD*)(currentPos) = 0x01EA8348; //Little-endian reversed of "sub rdx,0x1"
-            currentPos += sizeof(DWORD);
+            if (oldChar == '<' && *(currentPos - 1) != 0x7F) //If the last operation was an addition and the addition amount is less than 0x7F
+            {
+                *(currentPos - 1) += 1;
+            }
+            else
+            {
+                *(DWORD*)(currentPos) = 0x01EA8348; //Little-endian reversed of "sub rdx,0x1"
+                currentPos += sizeof(DWORD);
+            }
             break;
         case '+':
-            *(DWORD*)(currentPos) = 0x01C08348; //Little-endian reversed of "add rax,0x1"
-            currentPos += sizeof(DWORD);
+            if (oldChar == '+' && *(currentPos - 1) != 0x7F) //If the last operation was an addition and the addition amount is less than 0x7F
+            {
+                *(currentPos - 1) += 1;
+            }
+            else
+            {
+                *(DWORD*)(currentPos) = 0x01C08348; //Little-endian reversed of "add rax,0x1"
+                currentPos += sizeof(DWORD);
+            }
             break;
         case '-':
-            *(DWORD*)(currentPos) = 0x01E88348; //Little-endian reversed of "sub rax,0x1"
-            currentPos += sizeof(DWORD);
+            if (oldChar == '-' && *(currentPos - 1) != 0x7F) //If the last operation was an addition and the addition amount is less than 0x7F
+            {
+                *(currentPos - 1) += 1;
+            }
+            else
+            {
+                *(DWORD*)(currentPos) = 0x01E88348; //Little-endian reversed of "sub rax,0x1"
+                currentPos += sizeof(DWORD);
+            }
             break;
         case '.':
             preFunctionCall(&currentPos, &saveStruct);
