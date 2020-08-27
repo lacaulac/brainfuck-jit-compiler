@@ -6,9 +6,6 @@
 
 typedef void (__cdecl *barebonesBytecode)();
 //https://defuse.ca/online-x86-assembler.htm#disassembly Don't forget to check x64
-typedef struct {
-    void* rdx;
-} typeSaveStruct;
 
 //A wrapper around putchar
 void __stdcall displayOneCharacter(int charToShow);
@@ -16,8 +13,8 @@ void __stdcall displayOneCharacter(int charToShow);
 //A wrapper around getchar
 int __stdcall getOneCharacter();
 
-void preFunctionCall(BYTE** pCurrentPos, typeSaveStruct* saveStruct);
-void postFunctionCall(BYTE** pCurrentPos, typeSaveStruct* saveStruct);
+void preFunctionCall(BYTE** pCurrentPos);
+void postFunctionCall(BYTE** pCurrentPo);
 
 int main(int argc, char** argv)
 {
@@ -33,9 +30,6 @@ int main(int argc, char** argv)
     //Stores the instruction adresses of non-yet written/defined end-of-loop pointers
     std::stack<BYTE**> loopStack;
 
-    //Contains some data that needs saving in certain situations
-    typeSaveStruct saveStruct;
-    saveStruct.rdx = NULL;
 
     void (__stdcall *dispFuncPtr)(int) = displayOneCharacter;
     int (__stdcall *getCFuncPtr)() = getOneCharacter;
@@ -134,7 +128,7 @@ int main(int argc, char** argv)
             }
             break;
         case '.':
-            preFunctionCall(&currentPos, &saveStruct);
+            preFunctionCall(&currentPos);
 
             //We do the function calling stuff
             *(DWORD*)currentPos = 0x000A8B48; //mov rcx, [rdx]
@@ -146,11 +140,11 @@ int main(int argc, char** argv)
             *(short*)currentPos = 0xD0FF; //call rax
             currentPos += sizeof(short);
 
-            postFunctionCall(&currentPos, &saveStruct);
+            postFunctionCall(&currentPos);
 
             break;
         case ',':
-            preFunctionCall(&currentPos, &saveStruct);
+            preFunctionCall(&currentPos);
 
             *(short*)currentPos = 0xB848; //Beginning of mov rax, ADDRESS
             currentPos += sizeof(short);
@@ -163,7 +157,7 @@ int main(int argc, char** argv)
             *(DWORD*)currentPos = 0x00C28949; //mov r10, rax
             currentPos += 3;
 
-            postFunctionCall(&currentPos, &saveStruct);
+            postFunctionCall(&currentPos);
 
             *(DWORD*)currentPos = 0x0012894C; //mov [rdx], r10
             currentPos += 3;
@@ -246,16 +240,11 @@ int __stdcall getOneCharacter()
     return getchar() & 0xFF;
 }
 
-void preFunctionCall(BYTE** pCurrentPos, typeSaveStruct* saveStruct)
+void preFunctionCall(BYTE** pCurrentPos)
 {
     //We save RDX beforehand
-
-    **(short**)pCurrentPos = 0xB848; //Beginning of mov rax, ADDRESS
-    *pCurrentPos += sizeof(short);
-    **(void***)pCurrentPos = (void*)(&saveStruct->rdx); //The actual ADDRESS of saveStruct.rdx
-    *pCurrentPos += sizeof(void**);
-    **(DWORD**)pCurrentPos = 0x00108948; //mov [rax], rdx
-    *pCurrentPos += 3;
+    **pCurrentPos = 0x52; //push rdx
+    *pCurrentPos += 1;
 
     //Let's move the stack around to avoid any bad stuff happening (or else the call wrecks the stack and thus the call stack for some reason)
     **(void***)pCurrentPos = (void*)0x00000000ffec8148; //sub rsp,0xff
@@ -264,7 +253,7 @@ void preFunctionCall(BYTE** pCurrentPos, typeSaveStruct* saveStruct)
     *pCurrentPos += 7;
 }
 
-void postFunctionCall(BYTE** pCurrentPos, typeSaveStruct* saveStruct)
+void postFunctionCall(BYTE** pCurrentPos)
 {
     //Let's move back the stack in it's normal place
     **(void***)pCurrentPos = (void*)0x00000000ffc48148; //add rsp,0xff
@@ -272,15 +261,8 @@ void postFunctionCall(BYTE** pCurrentPos, typeSaveStruct* saveStruct)
     **(void***)pCurrentPos = (void*)0x00000000ffc58148; //add rbp,0xff
     *pCurrentPos += 7;
 
-    //We restore edx
-    **pCurrentPos = 0x50; //push rax
-    *pCurrentPos += 1;
-    **(short**)pCurrentPos = 0xB848; //Beginning of mov rax, ADDRESS
-    *pCurrentPos += sizeof(short);
-    **(void***)pCurrentPos = (void*)(&saveStruct->rdx); //The actual ADDRESS of saveStruct.rdx
-    *pCurrentPos += sizeof(void**);
-    **(DWORD**)pCurrentPos = 0x00108B48; //mov rdx, [rax]
-    *pCurrentPos += 3;
-    **pCurrentPos = 0x58; //pop rax
+    
+    //We restore rdx
+    **pCurrentPos = 0x5A; //push rdx
     *pCurrentPos += 1;
 }
