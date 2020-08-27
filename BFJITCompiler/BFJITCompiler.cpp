@@ -80,7 +80,7 @@ int main(int argc, char** argv)
         {
             if (!wasAddSubInstruction)
             {
-                //Entering an "arithmetic" block (even though it might only contain one arithmetic instruction) arithmétique, so we get the value pointed by rdx into rax in order to do the math stuff
+                //Entering an "arithmetic" block (even though it might only contain one arithmetic instruction), so we get the value pointed by rdx into rax in order to do the math stuff
                 *(DWORD*)(currentPos) = 0x00028B48; //Little-endian reversed of "mov rax, [rdx]"
                 currentPos += 3;
             }
