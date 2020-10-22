@@ -1,7 +1,9 @@
-# Brainfuck JIT compiler
+# Brainfuck AoT compiler
 
-This is a half-baked attempt at making a x64 brainfuck kinda-just-in-time compiler.
-The "kinda" part comes from the fact that the compiler isn't quite capable of compiling on the fly at the moment and instead does compile the code before actually running it. The reason for that is that this the first time I'm writing something that's somewhat close to a compiler (hence the choice of the Brainfuck language) and I didn't want to over-complicate the task at first, since I'd really like to be able to make it capable of real JIT compiling.
+*This project is inactive. It was supposed to be a just-in-time compiler, but due to a lack of time stayed as an Ahead-of-Time compiler*
+
+This was a half-baked attempt at making a x64 brainfuck kinda-just-in-time compiler.
+The "kinda" part comes from the fact that the compiler isn't quite capable of compiling on the fly at the moment and instead does compile the code before actually running it. The reason for that is that this the first time I'm writing something that's somewhat close to a compiler (hence the choice of the Brainfuck language) and I didn't want to over-complicate the task at first, since I'd have really liked to be able to make it capable of real JIT compiling.
 
 ## How does it work?
 
@@ -17,11 +19,5 @@ The program works by performing this three tasks:
   - Kind of optimising the way addition and substraction work by not loading and saving the currently selected value from the data-bank to the arithmetic register if not needed.
   - Adding a `ret` instruction at the end, in order to return back to the `main` function
 - Running the code (The most straight-forward part)
-  -  As the compiled code was written to an executable part of the compiler's memory, we can just run it as a function.
+  - As the compiled code was written to an executable part of the compiler's memory, we can just run it as a function.
   - Also, just free memory and close the handle we've opened to the source code file
-
-## What's left to do
-
-### Optimisation
-
-- Actually doing JIT compilation
