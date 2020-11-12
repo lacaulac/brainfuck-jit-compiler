@@ -1,13 +1,15 @@
-# Brainfuck AoT compiler
+# Brainfuck JIT compiler
 
-*This project is inactive. It was supposed to be a just-in-time compiler, but due to a lack of time stayed as an Ahead-of-Time compiler*
+*This project is inactive.*
 
-This was a half-baked attempt at making a x64 brainfuck kinda-just-in-time compiler.
-The "kinda" part comes from the fact that the compiler isn't quite capable of compiling on the fly at the moment and instead does compile the code before actually running it. The reason for that is that this the first time I'm writing something that's somewhat close to a compiler (hence the choice of the Brainfuck language) and I didn't want to over-complicate the task at first, since I'd have really liked to be able to make it capable of real JIT compiling.
+This was an attempt at making an x64 Brainfuck just-in-time compiler.
+The "kinda" part comes from the fact that the compiler isn't quite capable of compiling on the fly at the moment and instead compiles the code before actually starting to run any of it. There are two reasons for that:
+- Brainfuck doesn't support functions. This means almost the whole code is going to run at some point.
+- This was my first try at making a compiler and I didn't plan to get much deeper in the subject than dealing with compiling code and basic optimisation.
 
 ## How does it work?
 
-The program works by performing this three tasks:
+The program works by performing the following three tasks:
 
 - Initialising the compiler & running environment (Getting ready)
   - Allocating writable & executable memory for the compiled code to be written to
